@@ -1,5 +1,15 @@
 # Frontend — UnaPáPet
 
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![React Router](https://img.shields.io/badge/React_Router-7-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![npm](https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+
 Frontend do site do UnaPáPet, feito em **React + TypeScript** (com Vite). Todo o código fica em `src/frontend/`.
 
 O design de referência está em `docs/template.zip` (6 telas mobile e a paleta de cores).
@@ -13,6 +23,7 @@ Site-UnaPaPet/
 └── src/
     └── frontend/
         ├── index.html
+        ├── package.json, tsconfig.json, vite.config.ts
         ├── main.tsx
         ├── App.tsx
         ├── routes/
@@ -147,7 +158,7 @@ Valores aproximados tirados do template, que devem ser confirmados com o time de
 | Creme | `#EFE2D3` |
 | Bege | `#DEBA9B` |
 
-## Regras para o time
+## Regras
 
 ### Estrutura
 - **Não crie pastas nem arquivos fora desta estrutura sem combinar com o time.** A ideia é manter o projeto pequeno e fácil de achar as coisas.
@@ -178,8 +189,85 @@ Valores aproximados tirados do template, que devem ser confirmados com o time de
 - Commits pequenos e com mensagem clara (`feat:`, `fix:`, `style:`).
 - **Nunca commite o `.env`**, só o `.env.example`.
 
+## Como rodar
+
+Em qualquer uma das formas, o primeiro passo é o mesmo: na **raiz do projeto**, copie o `.env.example` para `.env` e ajuste o `VITE_API_URL` para o endereço do backend.
+
+```bash
+cp .env.example .env
+```
+
+Depois, o site abre em **http://localhost:5173**.
+
+### Forma 1: npm puro (sem Docker)
+
+Precisa ter o Node.js instalado (versão 22 ou mais nova).
+
+```bash
+cd src/frontend
+npm install        # só na primeira vez, ou quando mudar o package.json
+npm run dev        # servidor de desenvolvimento, atualiza ao salvar
+```
+
+Outros comandos úteis:
+
+```bash
+npm run build      # confere os tipos e gera a versão de produção (pasta dist/)
+npm run preview    # abre a versão gerada pelo build
+```
+
+Para parar, `Ctrl + C`.
+
+### Forma 2: só com o Dockerfile (`Dockerfile.interface`)
+
+Precisa ter o Docker instalado. Rode tudo **na raiz do projeto**, e não dentro de `src/frontend`.
+
+```bash
+# 1. Construir a imagem (refaça quando mudar o código ou o package.json)
+docker build -f Dockerfile.interface -t unapapet-frontend .
+
+# 2. Subir o container
+docker run --rm -p 5173:5173 -e VITE_API_URL=http://localhost:3000 unapapet-frontend
+```
+
+- O `.env` não entra na imagem, então a URL do backend vai pelo `-e VITE_API_URL=...`.
+- Se a porta 5173 já estiver em uso, troque o lado esquerdo, por exemplo `-p 5199:5173`, e abra `http://localhost:5199`.
+- Esta forma não atualiza ao salvar: depois de mudar o código, é preciso refazer o build e subir de novo.
+- Para parar, `Ctrl + C`.
+
+### Forma 3: Docker Compose (`compose.yml`)
+
+Precisa ter o Docker com o Compose. É a forma mais prática, porque já lê o `.env` da raiz sozinha e vai servir também para subir o backend junto no futuro.
+
+```bash
+docker compose up --build      # constrói e sobe (veja os logs no terminal)
+docker compose up -d           # sobe em segundo plano
+docker compose logs -f         # acompanha os logs
+docker compose down            # para e remove o container
+```
+
+- O serviço do frontend se chama `interface` e recebe o `VITE_API_URL` do `.env`.
+- Depois de mudar o `.env`, recrie o container: `docker compose up -d --force-recreate`.
+- Depois de mudar o código ou o `package.json`, use `docker compose up --build`.
+- Para o site abrir no navegador, o serviço precisa publicar a porta: o `compose.yml` deve ter `ports: - "5173:5173"` no serviço `interface`.
+
+### Qual usar?
+
+| Forma | Quando usar |
+|---|---|
+| npm puro | No dia a dia do frontend: é a mais rápida e atualiza ao salvar. |
+| Dockerfile | Para testar se a imagem do frontend funciona isolada. |
+| Compose | Para subir o projeto completo do mesmo jeito em qualquer máquina. |
+
+### Problemas comuns
+
+- **`address already in use` / porta ocupada:** já tem algo na porta 5173 (talvez um `npm run dev` aberto). Feche o outro ou troque a porta.
+- **`VITE_API_URL` vazio ou `undefined`:** o `.env` não existe na raiz, ou a variável não começa com `VITE_`.
+- **O navegador não consegue chamar o backend:** o `VITE_API_URL` roda no navegador, então precisa ser um endereço que ele alcança (`http://localhost:3000`), e não o nome de um serviço do Compose.
+- **Tela em branco:** é o esperado enquanto as páginas ainda são esqueletos sem conteúdo.
+
 ## Estado atual
 
-- Os arquivos `.tsx` são só esqueletos, sem conteúdo. `api.ts` e os `.css` estão vazios.
-- Falta o setup do projeto: `package.json`, `tsconfig.json`, `vite.config.ts` (com o `envDir` apontando para a raiz) e as dependências: `react`, `react-dom`, `react-router-dom`, `typescript`, `vite`, `@vitejs/plugin-react`, `@types/react` e `@types/react-dom`.
-- Falta um `.gitignore` na raiz com pelo menos `node_modules/`, `dist/` e `.env`.
+- O projeto já roda (`npm run dev` abre uma página em branco). O setup está pronto: `package.json`, `tsconfig.json`, `vite.config.ts` (com `envDir` apontando para a raiz) e o `.gitignore` na raiz.
+- `index.html` e `main.tsx` já têm o mínimo para iniciar o app.
+- Os demais `.tsx` são só esqueletos, sem conteúdo. `api.ts` e os `.css` estão vazios.

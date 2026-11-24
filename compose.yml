@@ -1,0 +1,15 @@
+services:
+  interface:
+    build:
+      context: .
+      dockerfile: Dockerfile.interface
+
+    container_name: interface
+
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+
+    env_file:
+      - .env
+
+  
