@@ -11,7 +11,7 @@ class CommitteeCreate(BaseModel):
 #PUT /admin/committees/{id}
 class CommitteeUpdate(BaseModel):
 
-    name: str | None = Field(default=None, min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=80)
 
 
 #GET /admin/committees, GET /admin/committees/{id}

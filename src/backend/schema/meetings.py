@@ -12,7 +12,7 @@ class MeetingCreate(BaseModel):
 #PUT /admin/meetings/{id}
 class MeetingUpdate(BaseModel):
 
-    date: datetime.date | None = None
+    date: datetime.date
 
 
 #GET /admin/meetings, GET /admin/meetings/{id}

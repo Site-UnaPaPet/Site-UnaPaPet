@@ -17,13 +17,20 @@ class CountThread:
 
         with self.lock:
 
-            count = 0 if not instance_name in self.count.keys() else self.count[instance_name]
             now = datetime.now(timezone.utc)
+            current = self.count.get(instance_name)
 
-            self.count[instance_name] = {
-                "count": count,
-                "exp": now + timedelta(minutes=1)
-            }
+            #janela nova se não existe ou já venceu; senão só soma (o exp não é renovado)
+            if current is None or current["exp"] < now:
+
+                self.count[instance_name] = {
+                    "count": 1,
+                    "exp": now + timedelta(minutes=1)
+                }
+
+            else:
+
+                current["count"] += 1
 
         logger.success(f"{instance_name} incremented!")
 

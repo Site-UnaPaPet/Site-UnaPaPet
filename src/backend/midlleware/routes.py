@@ -2,8 +2,12 @@
 
 #Rotas que não exigem token
 PUBLIC_ROUTES = [
+    {"path": "/health", "method": "GET"},
+
     {"path": "/auth/register", "method": "POST"},
     {"path": "/auth/login", "method": "POST"},
+    {"path": "/auth/refresh", "method": "POST"},
+    {"path": "/auth/logout", "method": "POST"},
 
     {"path": "/events", "method": "GET"},
     {"path": "/events/{id}", "method": "GET"},
@@ -18,6 +22,8 @@ PUBLIC_ROUTES = [
 
 #Rotas que exigem token de admin
 PRIVATE_ROUTES = [
+    {"path": "/admin", "method": "GET"},
+
     {"path": "/admin/events", "method": "GET"},
     {"path": "/admin/events", "method": "POST"},
     {"path": "/admin/events/{id}", "method": "GET"},

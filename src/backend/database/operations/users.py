@@ -96,6 +96,22 @@ class UsersOperations:
             logger.error(f"update_user failed: {error}")
             raise DatabaseOperationError(error) from error
 
+    async def get_user_by_email(self, email: str) -> Users | None:
+
+        logger.info("Getting user by email...")
+
+        try:
+
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Users).where(Users.email == email))
+                return result.scalar_one_or_none()
+
+        except Exception as error:
+
+            logger.error(f"get_user_by_email failed: {error}")
+            raise DatabaseOperationError(error) from error
+
     async def delete_user(self, user_id: int) -> bool:
 
         logger.info(f"Deleting user id={user_id}...")

@@ -31,3 +31,5 @@ class RegisterResponse(BaseModel):
 
     id: int
     email: str
+    access_token: str
+    token_type: str = "bearer"

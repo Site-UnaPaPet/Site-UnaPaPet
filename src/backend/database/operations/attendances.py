@@ -68,6 +68,22 @@ class AttendancesOperations:
             logger.error(f"get_attendance_by_student_meeting failed: {error}")
             raise DatabaseOperationError(error) from error
 
+    async def list_attendances(self) -> list[Attendances]:
+
+        logger.info("Listing attendances...")
+
+        try:
+
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Attendances).order_by(Attendances.id))
+                return list(result.scalars().all())
+
+        except Exception as error:
+
+            logger.error(f"list_attendances failed: {error}")
+            raise DatabaseOperationError(error) from error
+
     async def list_attendances_by_student(self, student_id: int) -> list[Attendances]:
 
         logger.info(f"Listing attendances of student={student_id}...")
