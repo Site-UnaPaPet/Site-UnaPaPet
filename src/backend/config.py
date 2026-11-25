@@ -33,21 +33,26 @@ class Settings:
     #Pega as variaveis obrigatorias
     def _get_requireds_(self) -> None:
 
-        for name in self.REQUIREDS:
+        if self.requireds is not None:
 
-            env = os.getenv(name)
 
-            if env is None:
-                raise NotFoundEnv(f"Expeted env {name}")
+            for name in self.requireds:
 
-            self.envs[name] = env 
+                env = os.getenv(name)
+
+                if env is None:
+                    raise NotFoundEnv(f"Expeted env {name}")
+
+                self.envs[name] = env 
 
     #Pega os opcionais
     def _get_optionals_(self) -> None:
 
-        for name in self.OPTIONALS:
+        if self.optinals is not None:
 
-            self.envs[name] = os.getenv(name)
+            for name in self.OPTIONALS:
+
+                self.envs[name] = os.getenv(name)
 
 
     #Carrega as variaveis
