@@ -50,7 +50,7 @@ class Settings:
 
         if self.optinals is not None:
 
-            for name in self.OPTIONALS:
+            for name in self.optinals:
 
                 self.envs[name] = os.getenv(name)
 

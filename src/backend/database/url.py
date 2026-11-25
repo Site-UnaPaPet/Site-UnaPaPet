@@ -10,7 +10,7 @@ def get_url(url:str|None=None, is_async:bool=True) -> str:
 
     else:
 
-        url = "asyncpg+" + url if not "asyncpg+" in url else url 
+        url = url.replace("postgresql://", "postgresql+asyncpg://") if not "asyncpg" in url and is_async else url
 
     return url
 
