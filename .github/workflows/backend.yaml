@@ -27,7 +27,7 @@ jobs:
                 python-version: 3.14
 
             - name: install dependences
-              run: pip install requirements.txt
+              run: pip install -r requirements.txt
             
             - name: test db
               run: python -m src.tests.db
