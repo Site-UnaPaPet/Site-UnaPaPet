@@ -7,7 +7,7 @@ class ManageConnect(EngineDb):
 
     def __init__(self, url, is_async:bool = True)->None:
 
-        self.url = get_url(url=url)
+        self.url = get_url(url=url, is_async=is_async)
 
         super().__init__(self.url, is_async)
 
