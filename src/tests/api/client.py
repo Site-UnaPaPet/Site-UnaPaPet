@@ -1,4 +1,7 @@
-"Cliente HTTP dos testes da API: so faz a requisicao em localhost e levanta erro se o status for >= 400"
+"""Cliente HTTP dos testes da API: so faz a requisicao em localhost e levanta erro se o status for >= 400.
+
+Simula o navegador: o Session guarda os cookies que a API manda (access_token e refresh_token) e os envia sozinho
+nas chamadas seguintes. Quem precisa de login usa um Client que ja chamou login(); sem token no cabecalho."""
 import os
 import time
 import uuid
@@ -21,6 +24,11 @@ class Client:
 
         #o Session guarda os cookies (refresh token) entre as chamadas
         self.session = requests.Session()
+
+    #Entra na conta: a API grava os cookies (access_token e refresh_token) neste cliente, igual ao navegador
+    def login(self, credentials: dict):
+
+        return self.call("POST", "/auth/login", json=credentials)
 
     #Faz a requisição e devolve o corpo (JSON). Se o status for >= 400, levanta ApiError mostrando o erro
     def call(self, method: str, path: str, json=None, token: str | None = None, **params):

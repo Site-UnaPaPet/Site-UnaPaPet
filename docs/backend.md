@@ -824,6 +824,9 @@ Todos rodam **da raiz do projeto**.
 - **Só fazem as requisições.** Qualquer resposta com status `>= 400` levanta o erro e mostra método, URL, status e corpo.
 - Um arquivo por rota. O `main.py` acha os arquivos da pasta (menos ele e o `client.py`) e roda o `run` de cada um e depois o `delete`, na ordem inversa. Um arquivo novo entra sozinho; se ele depender de dados de outro teste, coloque o nome na lista `ORDER` do `main.py`.
 - **Não mexem no banco.** A API precisa estar rodando, e o admin do `ADMIN` (em `main.py`) precisa **já existir** nela (o `create_admin` cria).
+- **Simulam o navegador com cookies.** O `Client` (em `client.py`) guarda os cookies que a API manda e os reenvia sozinho. O `main.py` faz o login do admin **uma vez** (`admin.login(ADMIN)`): a API grava o `access_token` no cookie desse cliente, e todas as rotas `/admin/...` são chamadas por ele **sem** cabeçalho `Authorization`. Os testes de `/auth` usam outro cliente, para o login e o logout deles não derrubarem a sessão do admin.
+- **Também testam o cabeçalho.** O `admin.py` chama `GET /admin` das duas formas: só com o cookie, e com um cliente novo mandando `Authorization: Bearer` (o `access_token` vem no corpo do login).
+- **A API precisa estar com `COOKIE_SECURE=false`.** O teste fala `http`, e o cliente não envia cookie `Secure` por `http`. Com `COOKIE_SECURE=true` o teste para em `POST /auth/refresh` com `401`.
 - A URL é `http://localhost:8000`. Para outra porta, use `API_URL=http://localhost:8001 python -m src.tests.api.main`.
 - Uma rodada faz umas 70 requisições. Se o `RATE_LIMIT` for menor que isso, o teste espera o `Retry-After` e continua (pode demorar). Para rodar rápido, suba a API com um `RATE_LIMIT` maior.
 

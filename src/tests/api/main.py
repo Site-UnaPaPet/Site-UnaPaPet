@@ -5,6 +5,8 @@ de cada um na ordem inversa. Qualquer status >= 400 levanta o erro e para.
 Um arquivo novo nesta pasta entra sozinho: basta ter a função run(client, ctx) (e, se criar dados, delete(client, ctx)).
 
 Não mexe no banco: o admin abaixo precisa JÁ EXISTIR na API que está sendo testada.
+Os testes simulam o navegador: o login grava os cookies e as rotas /admin usam o cookie, sem cabeçalho Authorization.
+A API precisa estar com COOKIE_SECURE=false (o teste usa http, e o cliente não envia cookie Secure por http).
 Roda da raiz do projeto:  python -m src.tests.api.main
 """
 import importlib
@@ -50,7 +52,10 @@ def main() -> None:
     print(f"Chamando a API em {BASE_URL}")
 
     client = Client()
-    ctx: dict = {"admin": Client().call("POST", "/auth/login", json=ADMIN)["access_token"]}
+    #o admin entra uma vez: a API grava os cookies no Client dele, e as rotas /admin usam o cookie (como o navegador)
+    admin = Client()
+    login = admin.login(ADMIN)
+    ctx: dict = {"admin": admin, "token": login["access_token"]}
     modules = find_tests()
 
     #criar, ler e atualizar (a ordem importa: um usa o id do outro)

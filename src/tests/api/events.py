@@ -4,13 +4,13 @@ from .client import Client
 
 def run(client: Client, ctx: dict) -> None:
 
-    token = ctx["admin"]
-    event = client.call("POST", "/admin/events", json={"title": "Feira", "starts_at": "2030-12-01T10:00:00", "location": "Campus"}, token=token)
+    admin = ctx["admin"]
+    event = admin.call("POST", "/admin/events", json={"title": "Feira", "starts_at": "2030-12-01T10:00:00", "location": "Campus"})
     ctx["event_id"] = event["id"]
 
-    client.call("GET", f"/admin/events/{event['id']}", token=token)
-    client.call("GET", "/admin/events", token=token)
-    client.call("PUT", f"/admin/events/{event['id']}", json={"title": "Feira Pet"}, token=token)
+    admin.call("GET", f"/admin/events/{event['id']}")
+    admin.call("GET", "/admin/events")
+    admin.call("PUT", f"/admin/events/{event['id']}", json={"title": "Feira Pet"})
 
     #públicas, sem token
     client.call("GET", "/events")
@@ -19,4 +19,4 @@ def run(client: Client, ctx: dict) -> None:
 
 def delete(client: Client, ctx: dict) -> None:
 
-    client.call("DELETE", f"/admin/events/{ctx['event_id']}", token=ctx["admin"])
+    ctx["admin"].call("DELETE", f"/admin/events/{ctx['event_id']}")
