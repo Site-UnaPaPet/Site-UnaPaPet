@@ -29,7 +29,11 @@ Site-UnaPaPet/
         ├── routes/
         │   └── AppRoutes.tsx
         ├── services/
-        │   └── api.ts
+        │   ├── api.ts            ← cliente HTTP genérico (request, ApiError, criarCrud)
+        │   ├── auth.ts           ← cadastro, login, refresh, logout
+        │   ├── eventos.ts, posts.ts, formularios.ts
+        │   ├── presenca.ts       ← consulta pública por RA
+        │   └── comissoes.ts, alunos.ts, reunioes.ts, presencas.ts, usuarios.ts   ← só admin
         ├── pages/
         │   ├── Home/Home.tsx
         │   ├── Calendario/Calendario.tsx
@@ -60,7 +64,7 @@ Site-UnaPaPet/
 
 ```
 index.html → main.tsx → App.tsx → Layout (Header + conteúdo + Footer)
-                                      └── AppRoutes → pages/* → services/api.ts → backend
+                                      └── AppRoutes → pages/* → services/* → backend
 ```
 
 1. O navegador abre o `index.html`, que carrega o `main.tsx`.
@@ -95,18 +99,51 @@ index.html → main.tsx → App.tsx → Layout (Header + conteúdo + Footer)
 
 ### `services/`
 
-| Arquivo | O que deve ter | Para que serve |
-|---|---|---|
-| `api.ts` | A URL base lida de `import.meta.env.VITE_API_URL`, uma função genérica de requisição (GET/POST) que converte a resposta em JSON, trata erros (status diferente de 2xx, falha de rede) e os tipos TypeScript das respostas. | É o **único** lugar que conversa com o backend. Se a URL, o formato de erro ou a autenticação mudarem, só este arquivo muda. Se crescer, divida por assunto (`eventos.ts`, `posts.ts`, `presenca.ts`) e deixe o `api.ts` só com a parte genérica. |
+É o **único** lugar que conversa com o backend. Cada arquivo tem os tipos TypeScript das respostas e as funções de um assunto. Os nomes dos campos são os mesmos da API (`starts_at`, `image_url`...). A referência completa das rotas está em `docs/backend.md`.
 
-O que cada página espera do backend (endpoints e formato ainda a combinar com o time do backend):
-
-| Página | Dado |
+| Arquivo | O que tem |
 |---|---|
-| Home e Blog | Lista de posts (título, resumo, imagem, data) |
-| Calendário | Lista de eventos (título, data, hora, local, imagem) |
-| Formulários | Lista de formulários (nome, link) |
-| Consulta por RA | Presença do aluno a partir do RA |
+| `api.ts` | `request<T>(método, caminho, opções)`: a função genérica. Lê `VITE_API_URL`, manda `credentials: "include"` em toda chamada, converte a resposta em JSON (e o `204` em `undefined`) e levanta `ApiError` quando o status é >= 400. Também `criarCrud(base)`, que gera as 5 rotas de admin de um recurso. |
+| `auth.ts` | `registrar`, `entrar`, `renovar`, `sair`, `buscarAdmin` e `souAdmin` (devolve `true`/`false`; serve para decidir se mostra o painel). |
+| `eventos.ts` | `listarEventos`, `buscarEvento` (públicas) e `eventosAdmin`. |
+| `posts.ts` | `listarPosts`, `buscarPost` (públicas) e `postsAdmin`. |
+| `formularios.ts` | `listarFormularios` (pública, só os ativos) e `formulariosAdmin`. |
+| `presenca.ts` | `consultarPresenca(ra)`: consulta pública por RA. |
+| `comissoes.ts`, `alunos.ts`, `reunioes.ts`, `presencas.ts`, `usuarios.ts` | Só admin: `comissoesAdmin`, `alunosAdmin` (+ `listarAlunos` com filtros), `reunioesAdmin`, `presencasAdmin` (+ `listarPresencas` com filtros) e `usuariosAdmin`. |
+
+Os `...Admin` têm as funções `listar(query?)`, `buscar(id)`, `criar(dados)`, `atualizar(id, dados)` e `apagar(id)`.
+
+**Como usar numa página:**
+
+```tsx
+import { useEffect, useState } from "react";
+import { listarEventos, type Evento } from "../../services/eventos";
+import { ApiError } from "../../services/api";
+
+const [eventos, setEventos] = useState<Evento[] | null>(null);   // null = carregando
+const [erro, setErro] = useState("");
+
+useEffect(() => {
+  listarEventos()
+    .then(setEventos)
+    .catch((e: unknown) => setErro(e instanceof ApiError ? e.message : "Erro inesperado."));
+}, []);
+```
+
+**Login:** o backend guarda o token em cookies `httpOnly`, então **não existe token no JavaScript** (nada de `localStorage`). Depois de `entrar(...)`, todas as chamadas já vão autenticadas. Se o login vencer (15 minutos), o `request` renova sozinho (`/auth/refresh`) e repete a chamada, uma vez. Várias chamadas ao mesmo tempo compartilham a mesma renovação.
+
+**Erros:** toda falha vira `ApiError`, com `status` (`0` = sem conexão), `detail` (texto técnico do backend) e `message` (texto em português, pronto para mostrar na tela, como "E-mail ou senha incorretos." ou "Este e-mail já está cadastrado.").
+
+**Para funcionar no navegador:** a variável `ORIGIN` do backend precisa ter a URL do site (`http://localhost:5173`). Com `ORIGIN=*` o navegador não envia os cookies e o login não funciona.
+
+O que cada página usa:
+
+| Página | Função |
+|---|---|
+| Home e Blog | `listarPosts()` |
+| Calendário | `listarEventos()` |
+| Formulários | `listarFormularios()` |
+| Consulta por RA | `consultarPresenca(ra)` |
 
 ### `pages/`
 
@@ -270,4 +307,5 @@ docker compose down            # para e remove o container
 
 - O projeto já roda (`npm run dev` abre uma página em branco). O setup está pronto: `package.json`, `tsconfig.json`, `vite.config.ts` (com `envDir` apontando para a raiz) e o `.gitignore` na raiz.
 - `index.html` e `main.tsx` já têm o mínimo para iniciar o app.
-- Os demais `.tsx` são só esqueletos, sem conteúdo. `api.ts` e os `.css` estão vazios.
+- Os `services/` estão prontos (funções, tipos e tratamento de erro) e conferidos com `tsc --noEmit` e contra a API de verdade. Falta ligar as páginas a eles.
+- Os demais `.tsx` são só esqueletos, sem conteúdo. Os `.css` estão vazios.

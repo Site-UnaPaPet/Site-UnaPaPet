@@ -76,7 +76,7 @@ Requisição → CORS → Midlleware (rate limit) → handles/* → depends.py �
 6. A rota chama uma função de `database/operations/`, que mexe na tabela de `database/models/`.
 7. Se o banco der erro, vira `DatabaseOperationError` e a API responde `409` ou `500`.
 
-A `ManageOperations` é criada **uma vez**, quando a API liga (função `lifespan` do `main.py`), e fica em `request.state.operations`.
+Quando a API liga, o `lifespan` do `main.py` cria uma `ManageOperations` e a guarda em `request.state.operations` (ela traz a conexão com o banco). A cada requisição, o `get_ops` (em `depends.py`) abre uma **sessão nova** a partir dessa conexão e entrega uma `ManageOperations` própria da requisição, fechada no fim. Assim, várias requisições ao mesmo tempo não se atrapalham.
 
 ## O que cada arquivo deve ter
 
@@ -86,7 +86,7 @@ A `ManageOperations` é criada **uma vez**, quando a API liga (função `lifespa
 |---|---|---|
 | `main.py` | A classe `Server` (`add_midlleware`, `add_cors`, `add_routes` e `run`), o `lifespan`, e no fim `app = instance.run()`. Também os comandos de terminal `make_migrate` e `create_admin`. | Ponto de entrada. É o `src.backend.main:app` que o `uvicorn` roda. |
 | `config.py` | A classe `Settings`, que carrega o `.env` e lê as variáveis obrigatórias (`requireds`) e opcionais (`optionals`). Faltou uma obrigatória: levanta `NotFoundEnv`. | Único lugar que lê variáveis de ambiente. |
-| `depends.py` | `AuthDepends` (`get_payload` valida o token; `require_admin` exige admin) e `get_ops` (pega a `ManageOperations` do `request.state`). | Dependências que as rotas injetam com `Depends(...)`. |
+| `depends.py` | `AuthDepends` (`get_payload` valida o token; `require_admin` exige admin) e `get_ops` (entrega uma `ManageOperations` com sessão de banco própria para cada requisição). | Dependências que as rotas injetam com `Depends(...)`. |
 | `exceptions.py` | Uma classe por erro: `NotFoundEnv`, `SettingsValueError`, `ConnectionDatabaseError`, `SessionMakeError`, `DatabaseOperationError`, `InvalidTokenError`, `InstanceNotFound`. | Erros com nome claro, para quem captura saber o que aconteceu. |
 | `logs.py` | O objeto `logger`. | Todo o projeto usa o mesmo logger. |
 
@@ -884,6 +884,5 @@ O arquivo `.github/workflows/backend.yaml` roda a cada push e PR para `main` e `
 - Rotas, autenticação (access + refresh), rate limit, CORS, banco, comandos e testes estão prontos.
 - **O logout só apaga os cookies.** Os tokens são JWT sem registro no banco, então não dá para cancelá-los no servidor: quem copiou um deles antes pode usá-lo até vencer (15 minutos o access, 7 dias o refresh).
 - **O `role` vai dentro do token.** Um admin rebaixado continua admin até o access token vencer (15 minutos).
-- **Uma sessão de banco compartilhada.** A `ManageOperations` é uma só para todas as requisições, e a `AsyncSession` do SQLAlchemy não aceita uso simultâneo. Com muitas requisições ao mesmo tempo, o ideal é uma sessão por requisição.
 - **O rate limit fica na memória do processo.** Com mais de um worker, cada um conta separado.
 - **O `midlleware/routes.py` ainda não é usado pelo middleware:** o limite vale igual para todas as rotas.

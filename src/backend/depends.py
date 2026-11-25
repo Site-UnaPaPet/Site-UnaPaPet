@@ -1,6 +1,8 @@
 "Dependencias para injetar nas rotas"
+from collections.abc import AsyncIterator
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from src.backend.auth.manage import AuthManage
 from src.backend.database.operations.manage import ManageOperations
 from src.backend.exceptions import InvalidTokenError
@@ -69,10 +71,21 @@ class AuthDepends:
         return payload
 
 
-#Pega a ManageOperations que o main guardou em app.state / request.state
-def get_ops(request: Request) -> ManageOperations:
+#Entrega uma ManageOperations com uma sessão de banco NOVA para cada requisição (fechada no fim).
+#A que o main guardou em request.state.operations só empresta a engine: a AsyncSession não aceita uso
+#simultâneo, e duas requisições ao mesmo tempo na mesma sessão dão "A transaction is already begun".
+async def get_ops(request: Request) -> AsyncIterator[ManageOperations]:
 
-    return request.state.operations
+    sessions = getattr(request.app.state, "sessions", None)
+
+    if sessions is None:
+
+        sessions = async_sessionmaker(request.state.operations.session.bind, expire_on_commit=False)
+        request.app.state.sessions = sessions
+
+    async with sessions() as session:
+
+        yield ManageOperations(session=session)
 
 
 auth_depends = AuthDepends()
