@@ -1,0 +1,11 @@
+FROM python:3.14
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+WORKDIR /app
+COPY src/backend src/backend
+EXPOSE 8000
+# Em ordem, e cada passo só roda se o anterior deu certo:
+# 1. cria as tabelas (só as que ainda não existem)
+# 2. cria o admin com ADMIN_EMAIL e ADMIN_PASSWORD (se ele já existe, não faz nada)
+# 3. sobe o servidor (o exec faz o uvicorn virar o processo principal do container e receber o sinal de desligar)
+CMD [ "sh", "-c", "python -m src.backend.main make_migrate && python -m src.backend.main create_admin && exec python -m uvicorn src.backend.main:app --port 8000 --host 0.0.0.0" ]

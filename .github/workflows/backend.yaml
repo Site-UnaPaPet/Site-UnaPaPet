@@ -18,6 +18,18 @@ jobs:
 
         runs-on: ubuntu-latest
 
+        # Variáveis do .env, só valores de teste (sem secrets). Valem para todos os passos deste job.
+        env:
+            VITE_API_URL: http://localhost:8000
+            JWT_SECRET: segredo-de-teste-do-ci
+            ORIGIN: "*"
+            RATE_LIMIT: "1000"
+            GLOBAL_RATE_LIMIT: "100000"
+            URL_DB: sqlite:///data/data.db
+            COOKIE_SECURE: "false"
+            ADMIN_EMAIL: admin@teste.com
+            ADMIN_PASSWORD: admin1234
+
         steps:
 
             - uses: actions/checkout@v4
