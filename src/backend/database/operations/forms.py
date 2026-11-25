@@ -1,0 +1,86 @@
+"Operações da tabela forms"
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.backend.logs import logger
+from src.backend.database.models import Forms
+
+ALLOWED_FIELDS = ("title", "url", "position", "active")
+
+
+class FormsOperations:
+
+    def __init__(self, session: AsyncSession) -> None:
+
+        self.session = session
+
+    async def create_form(self, title: str, url: str, position: int = 0, active: bool = True) -> Forms:
+
+        logger.info("Creating form...")
+
+        async with self.session.begin():
+
+            obj = Forms(title=title, url=url, position=position, active=active)
+            self.session.add(obj)
+            await self.session.flush()
+
+            logger.success(f"Form created (id={obj.id})")
+            return obj
+
+    async def get_form(self, form_id: int) -> Forms | None:
+
+        logger.info(f"Getting form id={form_id}...")
+
+        async with self.session.begin():
+
+            return await self.session.get(Forms, form_id)
+
+    async def list_forms(self) -> list[Forms]:
+
+        logger.info("Listing forms...")
+
+        async with self.session.begin():
+
+            result = await self.session.execute(select(Forms).order_by(Forms.position))
+            return list(result.scalars().all())
+
+    async def update_form(self, form_id: int, **fields) -> Forms | None:
+
+        logger.info(f"Updating form id={form_id}...")
+
+        async with self.session.begin():
+
+            obj = await self.session.get(Forms, form_id)
+
+            if obj is None:
+                logger.warning(f"Form id={form_id} not found")
+                return None
+
+            for key, value in fields.items():
+
+                if key not in ALLOWED_FIELDS:
+                    raise ValueError(f"Invalid field for form: {key}")
+
+                setattr(obj, key, value)
+
+            await self.session.flush()
+
+            logger.success(f"Form id={form_id} updated")
+            return obj
+
+    async def delete_form(self, form_id: int) -> bool:
+
+        logger.info(f"Deleting form id={form_id}...")
+
+        async with self.session.begin():
+
+            obj = await self.session.get(Forms, form_id)
+
+            if obj is None:
+                logger.warning(f"Form id={form_id} not found")
+                return False
+
+            await self.session.delete(obj)
+            await self.session.flush()
+
+            logger.success(f"Form id={form_id} deleted")
+            return True
