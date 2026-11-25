@@ -1,5 +1,5 @@
 "Dependencias para injetar nas rotas"
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from src.backend.auth.manage import AuthManage
 from src.backend.database.operations.manage import ManageOperations
@@ -37,10 +37,17 @@ class AuthDepends:
 
         self.require_admin = require_admin
 
-    #Valida o JWT do cabeçalho Authorization: Bearer <token> e retorna o payload
-    def get_payload(self, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> dict:
+    #Valida o JWT e retorna o payload. O token vem do cookie httpOnly "access_token" (navegador)
+    #ou do cabeçalho Authorization: Bearer <token> (outros clientes); se vierem os dois, vale o cabeçalho
+    def get_payload(
+        self,
+        credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+        access_token: str | None = Cookie(default=None),
+    ) -> dict:
 
-        if credentials is None:
+        token = credentials.credentials if credentials is not None else access_token
+
+        if token is None:
 
             logger.warning("Request without token")
 
@@ -48,7 +55,7 @@ class AuthDepends:
 
         try:
 
-            payload = self.auth.read(credentials.credentials)
+            payload = self.auth.read(token)
 
         except InvalidTokenError:
 

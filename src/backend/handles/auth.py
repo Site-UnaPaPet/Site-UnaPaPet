@@ -15,6 +15,10 @@ auth = auth_depends.auth
 
 ACCESS_MINUTES = 15
 REFRESH_DAYS = 7
+
+#os dois tokens ficam em cookies httpOnly: o access vale para o site todo, o refresh só para /auth
+ACCESS_COOKIE = "access_token"
+ACCESS_COOKIE_PATH = "/"
 REFRESH_COOKIE = "refresh_token"
 COOKIE_PATH = "/auth"
 
@@ -39,8 +43,20 @@ def _create_refresh(user: Users) -> str:
     return auth.create({"sub": str(user.id), "type": "refresh", "exp": exp})
 
 
-#salva o refresh token num cookie httpOnly (o JavaScript do site não consegue ler)
-def _set_refresh_cookie(response: Response, user: Users) -> None:
+#salva o access e o refresh token em cookies httpOnly (o JavaScript do site não consegue ler) e devolve o access token
+def set_cookies(response: Response, user: Users) -> str:
+
+    access = _create_access(user)
+
+    response.set_cookie(
+        key=ACCESS_COOKIE,
+        value=access,
+        max_age=ACCESS_MINUTES * 60,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        path=ACCESS_COOKIE_PATH,
+    )
 
     response.set_cookie(
         key=REFRESH_COOKIE,
@@ -52,9 +68,12 @@ def _set_refresh_cookie(response: Response, user: Users) -> None:
         path=COOKIE_PATH,
     )
 
+    return access
 
-def _clear_refresh_cookie(response: Response) -> None:
 
+def clear_cookies(response: Response) -> None:
+
+    response.delete_cookie(key=ACCESS_COOKIE, path=ACCESS_COOKIE_PATH, httponly=True, secure=COOKIE_SECURE, samesite="lax")
     response.delete_cookie(key=REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, secure=COOKIE_SECURE, samesite="lax")
 
 
@@ -67,11 +86,11 @@ async def register(body: RegisterRequest, response: Response, ops: ManageOperati
     #a senha nunca vai pro banco em texto puro: só o hash bcrypt; o role é sempre "member"
     user = await ops.create_user(body.email, auth.generate(body.password), role="member")
 
-    _set_refresh_cookie(response, user)
+    access = set_cookies(response, user)
 
     logger.success(f"User {user.id} registered")
 
-    return RegisterResponse(id=user.id, email=user.email, access_token=_create_access(user))
+    return RegisterResponse(id=user.id, email=user.email, access_token=access)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -88,11 +107,11 @@ async def login(body: LoginRequest, response: Response, ops: ManageOperations = 
 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-    _set_refresh_cookie(response, user)
+    access = set_cookies(response, user)
 
     logger.success(f"User {user.id} logged in")
 
-    return TokenResponse(access_token=_create_access(user))
+    return TokenResponse(access_token=access)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -113,7 +132,7 @@ async def refresh(
 
     except InvalidTokenError:
 
-        _clear_refresh_cookie(response)
+        clear_cookies(response)
         raise invalid
 
     #o access token não serve como refresh token
@@ -124,20 +143,20 @@ async def refresh(
 
     if user is None:
 
-        _clear_refresh_cookie(response)
+        clear_cookies(response)
         raise invalid
 
-    #gira o refresh token: a cada uso sai um novo
-    _set_refresh_cookie(response, user)
+    #gira os dois tokens: a cada uso saem novos
+    access = set_cookies(response, user)
 
     logger.success(f"Token refreshed for user {user.id}")
 
-    return TokenResponse(access_token=_create_access(user))
+    return TokenResponse(access_token=access)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(response: Response):
 
-    _clear_refresh_cookie(response)
+    clear_cookies(response)
 
     logger.success("Logged out")

@@ -168,7 +168,7 @@ O `.env` fica na **raiz do projeto**. Copie o `.env.example` e ajuste.
 | `ADMIN_EMAIL` | Só no `create_admin` | E-mail do admin criado pelo comando. | `admin@exemplo.com` |
 | `ADMIN_PASSWORD` | Só no `create_admin` | Senha do admin (de 8 a 72 caracteres). | — |
 
-> Com `ORIGIN=*` o navegador **não** envia o cookie do refresh token entre origens diferentes. Em produção, liste as URLs reais do site.
+> Com `ORIGIN=*` o navegador **não** envia os cookies (`access_token` e `refresh_token`) entre origens diferentes, e o login pelo site não funciona. Para o frontend usar a API, liste a origem dele (`ORIGIN=http://localhost:5173`). `*` serve só para testar com `curl` ou com os testes da API.
 
 ## Rotas
 
@@ -181,8 +181,8 @@ Base: `http://localhost:8000`. A documentação interativa (para testar as rotas
 | `GET` | `/health` | Devolve `{"status": "ok"}`. |
 | `POST` | `/auth/register` | Cria uma conta (sempre como `member`) e devolve o token. |
 | `POST` | `/auth/login` | Entra e devolve o token. |
-| `POST` | `/auth/refresh` | Gera um novo token usando o cookie do refresh. |
-| `POST` | `/auth/logout` | Apaga o cookie do refresh. |
+| `POST` | `/auth/refresh` | Gera um novo access token usando o cookie do refresh. |
+| `POST` | `/auth/logout` | Apaga os cookies (`access_token` e `refresh_token`). |
 | `GET` | `/events` | Lista os eventos (Calendário). |
 | `GET` | `/events/{id}` | Um evento. |
 | `GET` | `/posts` | Lista os posts (Blog), do mais novo ao mais antigo. |
@@ -208,20 +208,7 @@ Filtros opcionais na lista:
 - `GET /admin/students?committee_id=1&only_active=true`
 - `GET /admin/attendances?student_id=1` ou `?meeting_id=1`
 
-### Corpo de cada recurso (`POST`)
-
-| Recurso | Campos |
-|---|---|
-| `events` | `title`, `starts_at`, e opcionais: `description`, `location`, `image_url` |
-| `posts` | `title`, `published_at`, e opcionais: `summary`, `image_url` |
-| `forms` | `title`, `url`, e opcionais: `position` (0), `active` (true) |
-| `committees` | `name` |
-| `students` | `ra`, `name`, `committee_id`, e opcional: `active` (true) |
-| `meetings` | `date` (`AAAA-MM-DD`) |
-| `attendances` | `student_id`, `meeting_id`, `status` (`PRESENT`, `ABSENT` ou `EXCUSED`) |
-| `users` | `email`, `password`, e opcional: `role` (`member`; só o admin pode escolher `admin`) |
-
-No `PUT`, envie só o que quer mudar (em `events`, `posts`, `forms`, `students` e `users`). Em `committees` o `name` é obrigatório, em `meetings` o `date` e em `attendances` o `status`.
+Os campos de cada recurso, com os limites, exemplos de corpo e de resposta, estão na seção **Referência detalhada das rotas**, mais abaixo.
 
 ### Códigos de resposta
 
@@ -236,12 +223,484 @@ No `PUT`, envie só o que quer mudar (em `events`, `posts`, `forms`, `students` 
 | `429` | Muitas requisições. O cabeçalho `Retry-After` diz quantos segundos esperar. |
 | `500` | Erro no banco (sem detalhes na resposta, só no log). |
 
+## Referência detalhada das rotas
+
+Tudo o que precisa para chamar cada rota: método, caminho, headers, parâmetros, corpo, resposta e erros possíveis.
+
+### Convenções gerais
+
+**Base:** `http://localhost:8000`. Os corpos de requisição e de resposta são sempre **JSON** (UTF-8).
+
+#### Headers da requisição
+
+| Header | Quando enviar | Valor |
+|---|---|---|
+| `Content-Type` | Em toda requisição **com corpo** (`POST` e `PUT`) | `application/json` |
+| `Cookie` | Em toda rota protegida (`/admin/...`) e em `POST /auth/refresh` | `access_token=...` e `refresh_token=...`. **O navegador manda sozinho**, se a chamada usar `credentials: "include"`. É o jeito padrão do site. |
+| `Authorization` | Alternativa ao cookie, para clientes que não são navegador (`curl`, testes, outros programas) | `Bearer <access_token>`. Se vierem os dois, vale o `Authorization`. |
+| `Origin` | O navegador envia sozinho | Precisa estar na variável `ORIGIN` do backend (ou ela ser `*`). |
+
+O CORS só aceita os headers `Authorization` e `Content-Type` e os métodos `GET`, `POST`, `PUT` e `DELETE`. Qualquer outro header customizado é barrado pelo navegador.
+
+#### Headers da resposta
+
+| Header | Quando aparece |
+|---|---|
+| `Set-Cookie` | Em `register`, `login` e `refresh` (grava os dois cookies) e em `logout` (apaga os dois). `access_token`: `HttpOnly`, `Path=/`, `SameSite=Lax`, `Max-Age=900` (15 minutos). `refresh_token`: `HttpOnly`, `Path=/auth`, `SameSite=Lax`, `Max-Age=604800` (7 dias). Os dois levam `Secure`, a não ser que `COOKIE_SECURE=false`. |
+| `WWW-Authenticate: Bearer` | Em toda resposta `401` de rota com token. |
+| `Retry-After: <segundos>` | Em toda resposta `429` (quanto esperar). |
+| `access-control-allow-origin` e outros de CORS | Quando a requisição traz `Origin` permitido. |
+
+#### Tipos dos campos
+
+| Tipo | Formato | Exemplo |
+|---|---|---|
+| `id` | Inteiro, gerado pela API. Nas URLs (`{id}`), um valor que não é inteiro responde `422`. | `7` |
+| data | `AAAA-MM-DD` | `"2026-11-25"` |
+| data e hora | ISO 8601, **sem fuso**. A API devolve no mesmo formato. | `"2026-12-01T10:00:00"` |
+| booleano | `true` ou `false` (sem aspas) | `true` |
+| texto opcional | Pode ser omitido ou `null` | `null` |
+
+#### Formato dos erros
+
+Toda resposta de erro tem um corpo JSON com a chave `detail`.
+
+```json
+{"detail": "Event not found"}
+```
+
+O `422` (corpo inválido) traz uma **lista**, com um item por campo errado:
+
+```json
+{
+  "detail": [
+    {
+      "type": "string_too_short",
+      "loc": ["body", "password"],
+      "msg": "String should have at least 8 characters",
+      "input": "123",
+      "ctx": {"min_length": 8}
+    }
+  ]
+}
+```
+
+`loc` diz onde está o erro (`body`, `query` ou `path`) e qual campo.
+
+| Status | `detail` | Quando |
+|---|---|---|
+| `401` | `Not authenticated` | Faltou o cookie `access_token` e o header `Authorization: Bearer ...`. |
+| `401` | `Invalid or expired token` | Token adulterado, expirado, ou um refresh token usado como access token. |
+| `403` | `Admin only` | Token válido, mas o usuário não é admin. |
+| `404` | `<Recurso> not found` | O `id` (ou RA) não existe. Ex.: `Event not found`. |
+| `409` | `Conflict with existing data` | Valor repetido onde precisa ser único (RA, nome de comitê, data de reunião, presença do mesmo aluno na mesma reunião...). |
+| `409` | `Email already registered` | E-mail já cadastrado (em `register` e em `POST /admin/users`). |
+| `422` | lista (acima) | Campo faltando, tipo errado, tamanho fora do limite. |
+| `429` | `Too many requests` | Passou do limite de requisições. Veja o header `Retry-After`. |
+| `500` | `Database error` | Falha inesperada no banco. Os detalhes só aparecem no log do servidor. |
+
+#### Exemplo com `fetch` (frontend)
+
+```js
+const API = "http://localhost:8000";
+
+// 1. login: o servidor grava os cookies httpOnly (o JavaScript nem enxerga o token)
+await fetch(`${API}/auth/login`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  credentials: "include",                       // obrigatório: sem isso o navegador ignora os cookies
+  body: JSON.stringify({ email: "admin@exemplo.com", password: "senha-do-admin" }),
+});
+
+// 2. rota protegida: não precisa de header de autenticação, o cookie vai sozinho
+const res = await fetch(`${API}/admin/events`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  credentials: "include",
+  body: JSON.stringify({ title: "Feira de adoção", starts_at: "2026-12-01T10:00:00" }),
+});
+if (!res.ok) throw new Error((await res.json()).detail);   // 401, 403, 409, 422...
+
+// 3. se vier 401, renove os cookies (sem corpo) e repita a chamada
+await fetch(`${API}/auth/refresh`, { method: "POST", credentials: "include" });
+
+// 4. sair: apaga os cookies
+await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" });
+```
+
+---
+
+### Saúde
+
+#### `GET /health`
+
+- **Acesso:** público. **Headers:** nenhum. **Corpo:** nenhum.
+- **Resposta `200`:**
+```json
+{"status": "ok"}
+```
+
+---
+
+### Autenticação (`/auth`)
+
+Os tokens são JWT. O **access token** vale 15 minutos e leva `sub` (id do usuário), `role` e `type: "access"`. O **refresh token** vale 7 dias e leva `sub` e `type: "refresh"`. Os dois são gravados em **cookies `httpOnly`** (o JavaScript do site não consegue ler). O access token também vem no corpo da resposta, para clientes que não usam cookie (`curl`, testes).
+
+#### `POST /auth/register`
+
+Cria uma conta. A conta nasce **sempre como `member`**: se mandar `role` no corpo, ele é ignorado.
+
+- **Acesso:** público.
+- **Headers:** `Content-Type: application/json`
+
+| Campo | Tipo | Obrigatório | Regras |
+|---|---|---|---|
+| `email` | texto | sim | Até 255 caracteres, no formato `algo@dominio.com`. |
+| `password` | texto | sim | De 8 a 72 caracteres (o bcrypt usa no máximo 72 **bytes**, e letras com acento ocupam mais de 1). |
+
+**Requisição:**
+```json
+{"email": "ana@exemplo.com", "password": "senha12345"}
+```
+
+**Resposta `201`:** e os headers `Set-Cookie: access_token=...` e `Set-Cookie: refresh_token=...`
+```json
+{"id": 4, "email": "ana@exemplo.com", "access_token": "eyJhbGciOi...", "token_type": "bearer"}
+```
+
+**Erros:** `409` (`Email already registered`), `422` (e-mail mal formado, senha curta).
+
+#### `POST /auth/login`
+
+- **Acesso:** público.
+- **Headers:** `Content-Type: application/json`
+
+| Campo | Tipo | Obrigatório | Regras |
+|---|---|---|---|
+| `email` | texto | sim | Até 255 caracteres, formato de e-mail. |
+| `password` | texto | sim | De 1 a 72 caracteres. |
+
+**Requisição:**
+```json
+{"email": "admin@exemplo.com", "password": "senha-do-admin"}
+```
+
+**Resposta `200`:** e os headers `Set-Cookie: access_token=...` e `Set-Cookie: refresh_token=...`
+```json
+{"access_token": "eyJhbGciOi...", "token_type": "bearer"}
+```
+
+**Erros:** `401` (`Invalid email or password`, a mesma mensagem para e-mail inexistente e senha errada), `422`.
+
+#### `POST /auth/refresh`
+
+Troca o refresh token por um access token novo e **gira** os dois (devolve dois cookies novos).
+
+- **Acesso:** precisa do cookie `refresh_token` (não usa `Authorization`).
+- **Headers:** nenhum obrigatório. No navegador, use `credentials: "include"`. Em `curl`, use `-b cookies.txt`.
+- **Corpo:** nenhum.
+
+**Resposta `200`:** e novos `Set-Cookie: access_token=...` e `Set-Cookie: refresh_token=...`
+```json
+{"access_token": "eyJhbGciOi...", "token_type": "bearer"}
+```
+
+**Erros:** `401` (`Invalid or expired refresh token`): sem cookie, cookie inválido ou vencido, ou o usuário foi apagado.
+
+O cookie `refresh_token` tem `Path=/auth`, então o navegador só o envia para rotas `/auth/...`. Já o `access_token` tem `Path=/` e vai em todas as rotas.
+
+#### `POST /auth/logout`
+
+- **Acesso:** público (não precisa de token). **Corpo:** nenhum.
+- **Resposta `204`:** sem corpo, e dois `Set-Cookie` com `Max-Age=0` (apagam o `access_token` e o `refresh_token`).
+
+O logout só apaga os cookies: ele **não invalida** os tokens no servidor (veja as pendências no fim).
+
+---
+
+### Rota de admin (`/admin`)
+
+#### `GET /admin`
+
+Confirma que o token é de um admin e devolve quem é. Serve para o frontend decidir se mostra o painel.
+
+- **Acesso:** admin.
+- **Headers:** o cookie `access_token` (o navegador manda sozinho) **ou** `Authorization: Bearer <access_token>`
+- **Resposta `200`:**
+```json
+{"id": 1, "role": "admin"}
+```
+- **Erros:** `401` (sem token, token inválido ou vencido), `403` (`Admin only`).
+
+---
+
+### Rotas públicas de leitura
+
+Sem `Authorization` e sem corpo. Nenhuma tem paginação: a lista vem inteira.
+
+#### `GET /events`
+
+Lista os eventos, do mais próximo ao mais distante (`starts_at` crescente).
+
+**Resposta `200`:**
+```json
+[
+  {
+    "id": 1,
+    "title": "Feira de adoção",
+    "description": null,
+    "location": "Campus",
+    "starts_at": "2026-12-01T10:00:00",
+    "image_url": null
+  }
+]
+```
+
+#### `GET /events/{id}`
+
+Um evento, no mesmo formato de um item acima. **Erros:** `404` (`Event not found`), `422` (`id` que não é inteiro).
+
+#### `GET /posts`
+
+Lista os posts, do mais novo ao mais antigo (`published_at` decrescente).
+
+**Resposta `200`:**
+```json
+[
+  {
+    "id": 1,
+    "title": "Novidade",
+    "summary": "Resumo do post",
+    "image_url": null,
+    "published_at": "2026-11-01T10:00:00"
+  }
+]
+```
+
+#### `GET /posts/{id}`
+
+Um post. **Erros:** `404` (`Post not found`).
+
+#### `GET /forms`
+
+Lista **só os formulários ativos** (`active: true`), ordenados por `position`.
+
+**Resposta `200`:**
+```json
+[
+  {"id": 1, "title": "Inscrição", "url": "https://exemplo.com/form", "position": 1, "active": true}
+]
+```
+
+#### `GET /attendance/{ra}`
+
+Consulta a presença de um aluno pelo RA.
+
+- **Parâmetro de caminho:** `ra` (texto), por exemplo `/attendance/123456`.
+- **Resposta `200`:** os totais por status e a lista de reuniões, da mais antiga para a mais nova.
+```json
+{
+  "name": "Ana",
+  "present": 3,
+  "absent": 1,
+  "excused": 0,
+  "meetings": [
+    {"date": "2026-11-01", "status": "PRESENT"},
+    {"date": "2026-11-08", "status": "ABSENT"}
+  ]
+}
+```
+- **Erros:** `404` (`Student not found`). É a mesma resposta para RA inexistente e para aluno inativo, de propósito, para não dar pistas.
+- Não devolve id, RA nem comitê. Só entram reuniões em que o aluno tem presença registrada.
+
+---
+
+### Rotas de admin (CRUD)
+
+Valem para os 8 recursos: `events`, `posts`, `forms`, `committees`, `students`, `meetings`, `attendances` e `users`. **Todas exigem** o token de um admin (cookie `access_token` ou `Authorization: Bearer <access_token>`) (erros `401` e `403` em qualquer uma).
+
+#### O padrão das 5 rotas
+
+| Método e caminho | Corpo | Resposta de sucesso | Erros |
+|---|---|---|---|
+| `GET /admin/{recurso}` | — | `200` e uma **lista** de itens | — |
+| `POST /admin/{recurso}` | campos do recurso (`Create`) | `201` e o item criado, com o `id` | `409`, `422` |
+| `GET /admin/{recurso}/{id}` | — | `200` e o item | `404` |
+| `PUT /admin/{recurso}/{id}` | campos a mudar (`Update`) | `200` e o item já atualizado | `404`, `409`, `422` |
+| `DELETE /admin/{recurso}/{id}` | — | `204` **sem corpo** | `404` |
+
+Headers: o cookie `access_token` (ou `Authorization`) em todas, e `Content-Type: application/json` no `POST` e no `PUT`.
+
+**Como o `PUT` funciona:**
+- Envie **só os campos que quer mudar**. Os que não vierem continuam como estão.
+- Campos de texto opcionais (`description`, `location`, `image_url`, `summary`) aceitam `null` para limpar o valor.
+- **Não envie `null` em campo obrigatório** (como `title`): o banco recusa e a resposta é `409`.
+- Exceções: em `committees`, `meetings` e `attendances` o `PUT` tem **um único campo, obrigatório** (`name`, `date` e `status`, respectivamente).
+
+**Apagar:** apagar um item que outro ainda usa (por exemplo um comitê que tem alunos) pode dar `409` em bancos que impõem a chave estrangeira, como o Postgres. Apague os filhos antes: presenças, depois alunos e reuniões, depois comitês.
+
+---
+
+#### `events` (`/admin/events`)
+
+| Campo | Tipo | `POST` | Regras |
+|---|---|---|---|
+| `title` | texto | obrigatório | De 1 a 150 caracteres. |
+| `starts_at` | data e hora | obrigatório | Ex.: `"2026-12-01T10:00:00"`. |
+| `description` | texto | opcional | Sem limite. |
+| `location` | texto | opcional | Até 150 caracteres. |
+| `image_url` | texto | opcional | Até 500 caracteres. |
+
+`PUT`: todos opcionais. A lista vem ordenada por `starts_at`. A resposta tem o mesmo formato do `GET /events`.
+
+```json
+{"title": "Feira de adoção", "starts_at": "2026-12-01T10:00:00", "location": "Campus"}
+```
+
+#### `posts` (`/admin/posts`)
+
+| Campo | Tipo | `POST` | Regras |
+|---|---|---|---|
+| `title` | texto | obrigatório | De 1 a 150 caracteres. |
+| `published_at` | data e hora | obrigatório | Ex.: `"2026-11-01T10:00:00"`. |
+| `summary` | texto | opcional | Sem limite. |
+| `image_url` | texto | opcional | Até 500 caracteres. |
+
+`PUT`: todos opcionais. A lista vem do mais novo ao mais antigo. Aqui a lista de admin traz todos os posts, igual à pública.
+
+```json
+{"title": "Novidade", "published_at": "2026-11-01T10:00:00", "summary": "Resumo do post"}
+```
+
+#### `forms` (`/admin/forms`)
+
+| Campo | Tipo | `POST` | Regras |
+|---|---|---|---|
+| `title` | texto | obrigatório | De 1 a 150 caracteres. |
+| `url` | texto | obrigatório | De 1 a 500 caracteres. |
+| `position` | inteiro | opcional | Padrão `0`. Define a ordem na lista pública. |
+| `active` | booleano | opcional | Padrão `true`. Só os ativos aparecem em `GET /forms`. |
+
+`PUT`: todos opcionais. A lista de **admin** traz também os formulários inativos.
+
+```json
+{"title": "Inscrição", "url": "https://exemplo.com/form", "position": 1, "active": true}
+```
+
+#### `committees` (`/admin/committees`)
+
+| Campo | Tipo | `POST` | `PUT` | Regras |
+|---|---|---|---|---|
+| `name` | texto | obrigatório | **obrigatório** | De 1 a 80 caracteres. **Único**: nome repetido dá `409`. |
+
+```json
+{"name": "Comunicação"}
+```
+Resposta: `{"id": 1, "name": "Comunicação"}`. A lista vem em ordem alfabética.
+
+#### `students` (`/admin/students`)
+
+| Campo | Tipo | `POST` | Regras |
+|---|---|---|---|
+| `ra` | texto | obrigatório | De 1 a 50 caracteres. **Único**: RA repetido dá `409`. |
+| `name` | texto | obrigatório | De 1 a 80 caracteres. |
+| `committee_id` | inteiro | obrigatório | `id` de um comitê. |
+| `active` | booleano | opcional | Padrão `true`. Aluno inativo não aparece na consulta pública por RA. |
+
+`PUT`: todos opcionais.
+
+```json
+{"ra": "123456", "name": "Ana", "committee_id": 1, "active": true}
+```
+Resposta: `{"id": 1, "ra": "123456", "name": "Ana", "committee_id": 1, "active": true}`.
+
+**Filtros na lista** (opcionais, na URL):
+
+| Parâmetro | Tipo | Efeito |
+|---|---|---|
+| `committee_id` | inteiro | Só os alunos desse comitê. |
+| `only_active` | booleano (`true`/`false`) | `true` devolve só os ativos. Padrão `false`. |
+
+Exemplo: `GET /admin/students?committee_id=1&only_active=true`. A lista vem em ordem alfabética pelo nome.
+
+> No SQLite, um `committee_id` que não existe pode ser aceito (ele não confere a chave estrangeira). No Postgres dá `409`.
+
+#### `meetings` (`/admin/meetings`)
+
+| Campo | Tipo | `POST` | `PUT` | Regras |
+|---|---|---|---|---|
+| `date` | data | obrigatório | **obrigatório** | `AAAA-MM-DD`. **Única**: não existem duas reuniões na mesma data (`409`). |
+
+```json
+{"date": "2026-11-25"}
+```
+Resposta: `{"id": 1, "date": "2026-11-25"}`. A lista vem em ordem de data.
+
+#### `attendances` (`/admin/attendances`)
+
+Registra se um aluno esteve (ou não) em uma reunião.
+
+| Campo | Tipo | `POST` | `PUT` | Regras |
+|---|---|---|---|---|
+| `student_id` | inteiro | obrigatório | não existe | `id` de um aluno. |
+| `meeting_id` | inteiro | obrigatório | não existe | `id` de uma reunião. |
+| `status` | texto | obrigatório | **obrigatório** | Exatamente `"PRESENT"`, `"ABSENT"` ou `"EXCUSED"` (maiúsculas). |
+
+Só pode haver **uma presença por aluno em cada reunião**: repetir o par dá `409`. No `PUT` só se muda o `status`.
+
+```json
+{"student_id": 1, "meeting_id": 1, "status": "PRESENT"}
+```
+Resposta: `{"id": 1, "student_id": 1, "meeting_id": 1, "status": "PRESENT"}`.
+
+**Filtros na lista** (opcionais; se mandar os dois, vale só `student_id`):
+
+| Parâmetro | Tipo | Efeito |
+|---|---|---|
+| `student_id` | inteiro | Só as presenças desse aluno. |
+| `meeting_id` | inteiro | Só as presenças dessa reunião. |
+
+Exemplo: `GET /admin/attendances?student_id=1`.
+
+#### `users` (`/admin/users`)
+
+Aqui, ao contrário do `register`, o admin **escolhe o `role`**.
+
+| Campo | Tipo | `POST` | Regras |
+|---|---|---|---|
+| `email` | texto | obrigatório | Até 255 caracteres, formato de e-mail. **Único**. |
+| `password` | texto | obrigatório | De 8 a 72 caracteres. É guardada só como hash bcrypt. |
+| `role` | texto | opcional | `"admin"` ou `"member"`. Padrão `"member"`. |
+
+`PUT`: todos opcionais. Mandar `password` troca a senha (a nova é convertida em hash antes de salvar).
+
+```json
+{"email": "novo@exemplo.com", "password": "senha12345", "role": "admin"}
+```
+Resposta: `{"id": 5, "email": "novo@exemplo.com", "role": "admin"}`. **Nunca** devolve a senha nem o hash.
+
+Erros próprios: `409` (`Email already registered`) no `POST`. Num `PUT` com e-mail que já existe, o `409` vem como `Conflict with existing data`.
+
+O `role` vai dentro do token: um usuário rebaixado continua admin até o access token vencer (no máximo 15 minutos).
+
+**Cookies nas rotas de usuário:**
+- `POST /admin/users` **não** mexe nos cookies de quem chamou: o admin continua logado como admin. Quem grava os cookies de login é o `POST /auth/register` (a pessoa criando a própria conta) e o `POST /auth/login`.
+- `DELETE /admin/users/{id}`: se o admin apagar **a própria conta** (o `id` é o dele), a resposta `204` já apaga os cookies `access_token` e `refresh_token` no navegador. Se apagar outro usuário, os cookies do admin ficam como estão.
+- Os cookies de outra pessoa ficam no navegador dela, e o servidor não consegue apagá-los. Como o token é um JWT sem registro no banco, quem foi apagado ainda usa o access token por até 15 minutos. Já o `POST /auth/refresh` falha na hora (`401`), porque confere se o usuário ainda existe.
+
+---
+
+### Limite de requisições (todas as rotas)
+
+Cada IP pode fazer `RATE_LIMIT` requisições por minuto, e todos os clientes juntos, `GLOBAL_RATE_LIMIT`. Passou: resposta `429` com `{"detail": "Too many requests"}` e o header `Retry-After` (em segundos). Espere esse tempo e repita a chamada.
+
 ## Autenticação
 
-- **Cadastro e login** devolvem um `access_token` (JWT) e **também** gravam um `refresh_token` num cookie `httpOnly` (o JavaScript do site não consegue lê-lo).
-- O **access token** vale **15 minutos** e vai no cabeçalho de toda rota protegida: `Authorization: Bearer <access_token>`.
-- O **refresh token** vale **7 dias**. Quando o access vencer, chame `POST /auth/refresh` (o navegador manda o cookie sozinho) e receba um novo.
-- O `POST /auth/logout` apaga o cookie.
+- **Cadastro e login** gravam **dois cookies `httpOnly`** (o JavaScript do site não consegue lê-los): o `access_token` e o `refresh_token`. O access token também vem no corpo da resposta, para clientes que não usam cookie.
+- O **access token** vale **15 minutos**. O navegador o manda sozinho no cookie (`credentials: "include"`); outros clientes podem mandar no cabeçalho `Authorization: Bearer <access_token>` (se vierem os dois, vale o cabeçalho).
+- O **refresh token** vale **7 dias** e só viaja nas rotas `/auth/...`. Quando o access vencer, chame `POST /auth/refresh` e receba os dois cookies novos.
+- O `POST /auth/logout` apaga os dois cookies.
+- Os cookies usam `SameSite=Lax`, que bloqueia o envio em requisições vindas de outros sites (proteção contra CSRF). O site e a API precisam estar no mesmo site (por exemplo, `localhost:5173` e `localhost:8000`) ou no mesmo domínio.
 - O `/auth/register` **ignora** o `role` do corpo: a conta nasce sempre como `member`. Só quem já é admin promove alguém, em `PUT /admin/users/{id}`.
 - Senhas são guardadas só como hash **bcrypt**. A senha precisa ter de 8 a 72 caracteres.
 - Mensagens de login não dizem se o e-mail existe: e-mail inexistente e senha errada respondem igual.
@@ -268,21 +727,26 @@ RA inexistente e RA de aluno inativo respondem o mesmo `404`, sem dar pistas. N�
 # Ver se a API está de pé
 curl http://localhost:8000/health
 
-# Criar conta (devolve o access_token)
+# Criar conta (grava os cookies e também devolve o access_token no corpo)
 curl -X POST http://localhost:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "ana@exemplo.com", "password": "senha12345"}'
 
-# Entrar (guarde o access_token da resposta)
+# Entrar: o -c guarda os cookies (access_token e refresh_token) no arquivo cookies.txt
 curl -X POST http://localhost:8000/auth/login \
+  -c cookies.txt \
   -H "Content-Type: application/json" \
   -d '{"email": "admin@exemplo.com", "password": "senha-do-admin"}'
 
-# Usar o token numa rota de admin
+# Usar numa rota de admin: o -b manda os cookies guardados (igual ao navegador)
 curl -X POST http://localhost:8000/admin/events \
-  -H "Authorization: Bearer SEU_ACCESS_TOKEN" \
+  -b cookies.txt \
   -H "Content-Type: application/json" \
   -d '{"title": "Feira de adoção", "starts_at": "2026-12-01T10:00:00", "location": "Campus"}'
+
+# Alternativa sem cookie: mande o access_token (que vem no corpo do login) no cabeçalho
+curl http://localhost:8000/admin \
+  -H "Authorization: Bearer SEU_ACCESS_TOKEN"
 
 # Listar eventos (público, sem token)
 curl http://localhost:8000/events
@@ -291,7 +755,7 @@ curl http://localhost:8000/events
 curl http://localhost:8000/attendance/123456
 ```
 
-No navegador (frontend), chame sempre com `credentials: "include"` nas rotas `/auth/...`, para o cookie do refresh ir e voltar.
+No navegador (frontend), chame **sempre** com `credentials: "include"` (em toda rota, não só nas `/auth/...`), para os cookies irem e voltarem. Com `curl`, use `-c cookies.txt` ao entrar e `-b cookies.txt` nas chamadas seguintes, ou o cabeçalho `Authorization`.
 
 ## Como rodar
 
@@ -409,13 +873,13 @@ O arquivo `.github/workflows/backend.yaml` roda a cada push e PR para `main` e `
 - **Login do admin dá `401`:** o admin não existe nesse banco. Rode `python -m src.backend.main create_admin` e confira se o `ADMIN_EMAIL` e a `ADMIN_PASSWORD` são os mesmos que você está usando.
 - **`429` do rate limit:** passou de `RATE_LIMIT` requisições por minuto. Espere o `Retry-After` ou aumente o limite no `.env`.
 - **O navegador bloqueia a chamada (CORS):** a origem do frontend não está no `ORIGIN`.
-- **O cookie do refresh não chega:** com `ORIGIN=*` ele não funciona entre origens. Liste a origem do frontend no `ORIGIN` e use `credentials: "include"`.
+- **Os cookies não chegam (o login pelo site "não pega"):** com `ORIGIN=*` o navegador não envia cookies entre origens. Liste a origem do frontend no `ORIGIN` (`http://localhost:5173`) e use `credentials: "include"` em todas as chamadas. Em `http` (sem HTTPS), defina `COOKIE_SECURE=false`, senão o navegador descarta os cookies.
 - **No Docker, a porta 8000 já está em uso:** feche o outro processo ou troque o lado esquerdo do `ports` no `compose.yml`.
 
 ## Estado atual e pendências
 
 - Rotas, autenticação (access + refresh), rate limit, CORS, banco, comandos e testes estão prontos.
-- **O logout só apaga o cookie.** O refresh token é um JWT sem registro no banco, então não dá para cancelá-lo no servidor: quem o copiou antes pode renová-lo até vencer (7 dias).
+- **O logout só apaga os cookies.** Os tokens são JWT sem registro no banco, então não dá para cancelá-los no servidor: quem copiou um deles antes pode usá-lo até vencer (15 minutos o access, 7 dias o refresh).
 - **O `role` vai dentro do token.** Um admin rebaixado continua admin até o access token vencer (15 minutos).
 - **Uma sessão de banco compartilhada.** A `ManageOperations` é uma só para todas as requisições, e a `AsyncSession` do SQLAlchemy não aceita uso simultâneo. Com muitas requisições ao mesmo tempo, o ideal é uma sessão por requisição.
 - **O rate limit fica na memória do processo.** Com mais de um worker, cada um conta separado.

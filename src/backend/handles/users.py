@@ -1,7 +1,8 @@
 "Rotas /admin/users"
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from src.backend.database.operations.manage import ManageOperations
 from src.backend.depends import auth_depends, get_ops
+from src.backend.handles.auth import clear_cookies
 from src.backend.schema.users import UserCreate, UserUpdate, UserResponse
 
 admin_router = APIRouter(
@@ -61,7 +62,16 @@ async def admin_update_user(id: int, body: UserUpdate, ops: ManageOperations = D
 
 
 @admin_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def admin_delete_user(id: int, ops: ManageOperations = Depends(get_ops)):
+async def admin_delete_user(
+    id: int,
+    response: Response,
+    payload: dict = Depends(auth_depends.require_admin),
+    ops: ManageOperations = Depends(get_ops),
+):
 
     if not await ops.delete_user(id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    #se o admin apagou a própria conta, apaga também os cookies de login dele no navegador
+    if str(id) == payload["sub"]:
+        clear_cookies(response)
