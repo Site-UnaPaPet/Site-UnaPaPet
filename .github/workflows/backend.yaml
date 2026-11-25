@@ -47,3 +47,13 @@ jobs:
             - name: test token
               run: python -m src.tests.encode
 
+            - name: create server
+              run: docker compose up --build -d
+            
+            - name: wait 10 seconds
+              run: sleep 10
+            
+            - name: test api
+              run: src.tests.api.main
+                
+

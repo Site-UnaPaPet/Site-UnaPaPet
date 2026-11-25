@@ -7,9 +7,17 @@ services:
 
     container_name: backend
 
-    env_file:
-      - .env
-    
+   
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      ORIGIN: ${ORIGIN:?defina ORIGIN}
+      RATE_LIMIT: ${RATE_LIMIT:?defina RATE_LIMIT}
+      GLOBAL_RATE_LIMIT: ${GLOBAL_RATE_LIMIT:?defina GLOBAL_RATE_LIMIT}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?defina ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina ADMIN_PASSWORD}
+      URL_DB: ${URL_DB:-sqlite:///data/data.db}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+
     ports:
       - 8000:8000
     
@@ -27,9 +35,9 @@ services:
 
     container_name: interface
 
-   
-    env_file:
-      - .env
+    # O navegador é quem chama a API, então a URL é a da porta publicada do backend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
 
     ports:
       - 5173:5173
