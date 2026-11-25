@@ -32,3 +32,6 @@ jobs:
             - name: test db
               run: python -m src.tests.db
 
+            - name: test token
+              run: python -m src.tests.encode
+

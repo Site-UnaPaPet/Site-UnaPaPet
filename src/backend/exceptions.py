@@ -12,3 +12,6 @@ class SessionMakeError(Exception):
 
 class DatabaseOperationError(Exception):
     pass
+
+class InvalidTokenError(Exception):
+    pass
