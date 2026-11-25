@@ -15,3 +15,6 @@ class DatabaseOperationError(Exception):
 
 class InvalidTokenError(Exception):
     pass
+
+class InstanceNotFound(Exception):
+    pass
