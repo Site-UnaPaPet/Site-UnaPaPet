@@ -2,6 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.backend.logs import logger
+from src.backend.exceptions import DatabaseOperationError
 from src.backend.database.models import Users
 
 ALLOWED_FIELDS = ("email", "password_hash", "role")
@@ -17,70 +18,105 @@ class UsersOperations:
 
         logger.info("Creating user...")
 
-        async with self.session.begin():
+        try:
 
-            obj = Users(email=email, password_hash=password_hash, role=role)
-            self.session.add(obj)
-            await self.session.flush()
+            async with self.session.begin():
 
-            logger.success(f"User created (id={obj.id})")
-            return obj
+                obj = Users(email=email, password_hash=password_hash, role=role)
+                self.session.add(obj)
+                await self.session.flush()
+
+                logger.success(f"User created (id={obj.id})")
+                return obj
+
+        except Exception as error:
+
+            logger.error(f"create_user failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def get_user(self, user_id: int) -> Users | None:
 
         logger.info(f"Getting user id={user_id}...")
 
-        async with self.session.begin():
+        try:
 
-            return await self.session.get(Users, user_id)
+            async with self.session.begin():
+
+                return await self.session.get(Users, user_id)
+
+        except Exception as error:
+
+            logger.error(f"get_user failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def list_users(self) -> list[Users]:
 
         logger.info("Listing users...")
 
-        async with self.session.begin():
+        try:
 
-            result = await self.session.execute(select(Users).order_by(Users.id))
-            return list(result.scalars().all())
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Users).order_by(Users.id))
+                return list(result.scalars().all())
+
+        except Exception as error:
+
+            logger.error(f"list_users failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def update_user(self, user_id: int, **fields) -> Users | None:
 
         logger.info(f"Updating user id={user_id}...")
 
-        async with self.session.begin():
+        try:
 
-            obj = await self.session.get(Users, user_id)
+            async with self.session.begin():
 
-            if obj is None:
-                logger.warning(f"User id={user_id} not found")
-                return None
+                obj = await self.session.get(Users, user_id)
 
-            for key, value in fields.items():
+                if obj is None:
+                    logger.warning(f"User id={user_id} not found")
+                    return None
 
-                if key not in ALLOWED_FIELDS:
-                    raise ValueError(f"Invalid field for user: {key}")
+                for key, value in fields.items():
 
-                setattr(obj, key, value)
+                    if key not in ALLOWED_FIELDS:
+                        raise ValueError(f"Invalid field for user: {key}")
 
-            await self.session.flush()
+                    setattr(obj, key, value)
 
-            logger.success(f"User id={user_id} updated")
-            return obj
+                await self.session.flush()
+
+                logger.success(f"User id={user_id} updated")
+                return obj
+
+        except Exception as error:
+
+            logger.error(f"update_user failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def delete_user(self, user_id: int) -> bool:
 
         logger.info(f"Deleting user id={user_id}...")
 
-        async with self.session.begin():
+        try:
 
-            obj = await self.session.get(Users, user_id)
+            async with self.session.begin():
 
-            if obj is None:
-                logger.warning(f"User id={user_id} not found")
-                return False
+                obj = await self.session.get(Users, user_id)
 
-            await self.session.delete(obj)
-            await self.session.flush()
+                if obj is None:
+                    logger.warning(f"User id={user_id} not found")
+                    return False
 
-            logger.success(f"User id={user_id} deleted")
-            return True
+                await self.session.delete(obj)
+                await self.session.flush()
+
+                logger.success(f"User id={user_id} deleted")
+                return True
+
+        except Exception as error:
+
+            logger.error(f"delete_user failed: {error}")
+            raise DatabaseOperationError(error) from error

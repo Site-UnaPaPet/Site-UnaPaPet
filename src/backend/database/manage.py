@@ -9,7 +9,7 @@ class ManageDb:
 
         instance = Settings(optionals=["URL_DB"])
 
-        self.url = instance.optinals["URL_DB"]
+        self.url = instance.envs.get("URL_DB")
         
 
     async def migrate(self) -> Migrate:
@@ -17,14 +17,14 @@ class ManageDb:
         conn = ManageConnect(url=self.url, is_async=False)
         await conn.connection()
 
-        return Migrate(engine=conn)
+        return Migrate(engine=conn.engine)
 
     async def operations(self) -> ManageOperations:
 
         instance = ManageConnect(url=self.url)
         await instance.connection()
 
-        return ManageOperations(session=instance.session)
+        return ManageOperations(session=instance.session())
 
     
 

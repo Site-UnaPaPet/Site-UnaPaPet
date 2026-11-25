@@ -2,6 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.backend.logs import logger
+from src.backend.exceptions import DatabaseOperationError
 from src.backend.database.models import Events
 from datetime import datetime
 
@@ -18,70 +19,105 @@ class EventsOperations:
 
         logger.info("Creating event...")
 
-        async with self.session.begin():
+        try:
 
-            obj = Events(title=title, starts_at=starts_at, description=description, location=location, image_url=image_url)
-            self.session.add(obj)
-            await self.session.flush()
+            async with self.session.begin():
 
-            logger.success(f"Event created (id={obj.id})")
-            return obj
+                obj = Events(title=title, starts_at=starts_at, description=description, location=location, image_url=image_url)
+                self.session.add(obj)
+                await self.session.flush()
+
+                logger.success(f"Event created (id={obj.id})")
+                return obj
+
+        except Exception as error:
+
+            logger.error(f"create_event failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def get_event(self, event_id: int) -> Events | None:
 
         logger.info(f"Getting event id={event_id}...")
 
-        async with self.session.begin():
+        try:
 
-            return await self.session.get(Events, event_id)
+            async with self.session.begin():
+
+                return await self.session.get(Events, event_id)
+
+        except Exception as error:
+
+            logger.error(f"get_event failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def list_events(self) -> list[Events]:
 
         logger.info("Listing events...")
 
-        async with self.session.begin():
+        try:
 
-            result = await self.session.execute(select(Events).order_by(Events.starts_at))
-            return list(result.scalars().all())
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Events).order_by(Events.starts_at))
+                return list(result.scalars().all())
+
+        except Exception as error:
+
+            logger.error(f"list_events failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def update_event(self, event_id: int, **fields) -> Events | None:
 
         logger.info(f"Updating event id={event_id}...")
 
-        async with self.session.begin():
+        try:
 
-            obj = await self.session.get(Events, event_id)
+            async with self.session.begin():
 
-            if obj is None:
-                logger.warning(f"Event id={event_id} not found")
-                return None
+                obj = await self.session.get(Events, event_id)
 
-            for key, value in fields.items():
+                if obj is None:
+                    logger.warning(f"Event id={event_id} not found")
+                    return None
 
-                if key not in ALLOWED_FIELDS:
-                    raise ValueError(f"Invalid field for event: {key}")
+                for key, value in fields.items():
 
-                setattr(obj, key, value)
+                    if key not in ALLOWED_FIELDS:
+                        raise ValueError(f"Invalid field for event: {key}")
 
-            await self.session.flush()
+                    setattr(obj, key, value)
 
-            logger.success(f"Event id={event_id} updated")
-            return obj
+                await self.session.flush()
+
+                logger.success(f"Event id={event_id} updated")
+                return obj
+
+        except Exception as error:
+
+            logger.error(f"update_event failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def delete_event(self, event_id: int) -> bool:
 
         logger.info(f"Deleting event id={event_id}...")
 
-        async with self.session.begin():
+        try:
 
-            obj = await self.session.get(Events, event_id)
+            async with self.session.begin():
 
-            if obj is None:
-                logger.warning(f"Event id={event_id} not found")
-                return False
+                obj = await self.session.get(Events, event_id)
 
-            await self.session.delete(obj)
-            await self.session.flush()
+                if obj is None:
+                    logger.warning(f"Event id={event_id} not found")
+                    return False
 
-            logger.success(f"Event id={event_id} deleted")
-            return True
+                await self.session.delete(obj)
+                await self.session.flush()
+
+                logger.success(f"Event id={event_id} deleted")
+                return True
+
+        except Exception as error:
+
+            logger.error(f"delete_event failed: {error}")
+            raise DatabaseOperationError(error) from error

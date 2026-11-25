@@ -2,7 +2,7 @@
 from pathlib import Path
 def get_url(url:str|None=None, is_async:bool=True) -> str:
 
-    BASE_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
 
     if url is None:
 
@@ -10,7 +10,14 @@ def get_url(url:str|None=None, is_async:bool=True) -> str:
 
     else:
 
-        url = url.replace("postgresql://", "postgresql+asyncpg://") if not "asyncpg" in url and is_async else url
+        if is_async:
+
+            url = url.replace("postgresql://", "postgresql+asyncpg://") if not "asyncpg" in url else url
+            url = url.replace("sqlite:///", "sqlite+aiosqlite:///") if not "aiosqlite" in url else url
+
+        else:
+
+            url = url.replace("postgresql+asyncpg://", "postgresql://").replace("sqlite+aiosqlite:///", "sqlite:///")
 
     return url
 

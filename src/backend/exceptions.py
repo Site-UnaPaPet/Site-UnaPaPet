@@ -9,3 +9,6 @@ class ConnectionDatabaseError(Exception):
 
 class SessionMakeError(Exception):
     pass
+
+class DatabaseOperationError(Exception):
+    pass

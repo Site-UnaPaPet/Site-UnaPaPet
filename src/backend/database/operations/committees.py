@@ -2,6 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.backend.logs import logger
+from src.backend.exceptions import DatabaseOperationError
 from src.backend.database.models import Committees
 
 
@@ -15,73 +16,115 @@ class CommitteesOperations:
 
         logger.info(f"Creating committee '{name}'...")
 
-        async with self.session.begin():
+        try:
 
-            committee = Committees(name=name)
-            self.session.add(committee)
-            await self.session.flush()
+            async with self.session.begin():
 
-            logger.success(f"Committee '{name}' created (id={committee.id})")
-            return committee
+                committee = Committees(name=name)
+                self.session.add(committee)
+                await self.session.flush()
+
+                logger.success(f"Committee '{name}' created (id={committee.id})")
+                return committee
+
+        except Exception as error:
+
+            logger.error(f"create_committee failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def get_committee(self, committee_id: int) -> Committees | None:
 
         logger.info(f"Getting committee id={committee_id}...")
 
-        async with self.session.begin():
+        try:
 
-            return await self.session.get(Committees, committee_id)
+            async with self.session.begin():
+
+                return await self.session.get(Committees, committee_id)
+
+        except Exception as error:
+
+            logger.error(f"get_committee failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def get_committee_by_name(self, name: str) -> Committees | None:
 
         logger.info(f"Getting committee name='{name}'...")
 
-        async with self.session.begin():
+        try:
 
-            result = await self.session.execute(select(Committees).where(Committees.name == name))
-            return result.scalar_one_or_none()
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Committees).where(Committees.name == name))
+                return result.scalar_one_or_none()
+
+        except Exception as error:
+
+            logger.error(f"get_committee_by_name failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def list_committees(self) -> list[Committees]:
 
         logger.info("Listing committees...")
 
-        async with self.session.begin():
+        try:
 
-            result = await self.session.execute(select(Committees).order_by(Committees.name))
-            return list(result.scalars().all())
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Committees).order_by(Committees.name))
+                return list(result.scalars().all())
+
+        except Exception as error:
+
+            logger.error(f"list_committees failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def update_committee(self, committee_id: int, name: str) -> Committees | None:
 
         logger.info(f"Updating committee id={committee_id}...")
 
-        async with self.session.begin():
+        try:
 
-            committee = await self.session.get(Committees, committee_id)
+            async with self.session.begin():
 
-            if committee is None:
-                logger.warning(f"Committee id={committee_id} not found")
-                return None
+                committee = await self.session.get(Committees, committee_id)
 
-            committee.name = name
-            await self.session.flush()
+                if committee is None:
+                    logger.warning(f"Committee id={committee_id} not found")
+                    return None
 
-            logger.success(f"Committee id={committee_id} updated")
-            return committee
+                committee.name = name
+                await self.session.flush()
+
+                logger.success(f"Committee id={committee_id} updated")
+                return committee
+
+        except Exception as error:
+
+            logger.error(f"update_committee failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def delete_committee(self, committee_id: int) -> bool:
 
         logger.info(f"Deleting committee id={committee_id}...")
 
-        async with self.session.begin():
+        try:
 
-            committee = await self.session.get(Committees, committee_id)
+            async with self.session.begin():
 
-            if committee is None:
-                logger.warning(f"Committee id={committee_id} not found")
-                return False
+                committee = await self.session.get(Committees, committee_id)
 
-            await self.session.delete(committee)
-            await self.session.flush()
+                if committee is None:
+                    logger.warning(f"Committee id={committee_id} not found")
+                    return False
 
-            logger.success(f"Committee id={committee_id} deleted")
-            return True
+                await self.session.delete(committee)
+                await self.session.flush()
+
+                logger.success(f"Committee id={committee_id} deleted")
+                return True
+
+        except Exception as error:
+
+            logger.error(f"delete_committee failed: {error}")
+            raise DatabaseOperationError(error) from error

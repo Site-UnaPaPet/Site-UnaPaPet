@@ -65,7 +65,7 @@ class EngineDb:
     async def get_engine(self) -> AsyncEngine|Engine:
 
         self._create_()
-        self._test_()
+        await self._test_()
         return self.eng
 
 

@@ -2,6 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.backend.logs import logger
+from src.backend.exceptions import DatabaseOperationError
 from src.backend.database.models import Students
 
 
@@ -15,87 +16,129 @@ class StudentsOperations:
 
         logger.info(f"Creating student RA={ra}...")
 
-        async with self.session.begin():
+        try:
 
-            student = Students(ra=ra, name=name, committee_id=committee_id, active=active)
-            self.session.add(student)
-            await self.session.flush()
+            async with self.session.begin():
 
-            logger.success(f"Student RA={ra} created (id={student.id})")
-            return student
+                student = Students(ra=ra, name=name, committee_id=committee_id, active=active)
+                self.session.add(student)
+                await self.session.flush()
+
+                logger.success(f"Student RA={ra} created (id={student.id})")
+                return student
+
+        except Exception as error:
+
+            logger.error(f"create_student failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def get_student(self, student_id: int) -> Students | None:
 
         logger.info(f"Getting student id={student_id}...")
 
-        async with self.session.begin():
+        try:
 
-            return await self.session.get(Students, student_id)
+            async with self.session.begin():
+
+                return await self.session.get(Students, student_id)
+
+        except Exception as error:
+
+            logger.error(f"get_student failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def get_student_by_ra(self, ra: str) -> Students | None:
 
         logger.info(f"Getting student RA={ra}...")
 
-        async with self.session.begin():
+        try:
 
-            result = await self.session.execute(select(Students).where(Students.ra == ra))
-            return result.scalar_one_or_none()
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Students).where(Students.ra == ra))
+                return result.scalar_one_or_none()
+
+        except Exception as error:
+
+            logger.error(f"get_student_by_ra failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def list_students(self, committee_id: int | None = None, only_active: bool = False) -> list[Students]:
 
         logger.info("Listing students...")
 
-        async with self.session.begin():
+        try:
 
-            query = select(Students).order_by(Students.name)
+            async with self.session.begin():
 
-            if committee_id is not None:
-                query = query.where(Students.committee_id == committee_id)
+                query = select(Students).order_by(Students.name)
 
-            if only_active:
-                query = query.where(Students.active.is_(True))
+                if committee_id is not None:
+                    query = query.where(Students.committee_id == committee_id)
 
-            result = await self.session.execute(query)
-            return list(result.scalars().all())
+                if only_active:
+                    query = query.where(Students.active.is_(True))
+
+                result = await self.session.execute(query)
+                return list(result.scalars().all())
+
+        except Exception as error:
+
+            logger.error(f"list_students failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def update_student(self, student_id: int, **fields) -> Students | None:
 
         logger.info(f"Updating student id={student_id}...")
 
-        async with self.session.begin():
+        try:
 
-            student = await self.session.get(Students, student_id)
+            async with self.session.begin():
 
-            if student is None:
-                logger.warning(f"Student id={student_id} not found")
-                return None
+                student = await self.session.get(Students, student_id)
 
-            for key, value in fields.items():
+                if student is None:
+                    logger.warning(f"Student id={student_id} not found")
+                    return None
 
-                if key not in ("ra", "name", "committee_id", "active"):
-                    raise ValueError(f"Invalid field for student: {key}")
+                for key, value in fields.items():
 
-                setattr(student, key, value)
+                    if key not in ("ra", "name", "committee_id", "active"):
+                        raise ValueError(f"Invalid field for student: {key}")
 
-            await self.session.flush()
+                    setattr(student, key, value)
 
-            logger.success(f"Student id={student_id} updated")
-            return student
+                await self.session.flush()
+
+                logger.success(f"Student id={student_id} updated")
+                return student
+
+        except Exception as error:
+
+            logger.error(f"update_student failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def delete_student(self, student_id: int) -> bool:
 
         logger.info(f"Deleting student id={student_id}...")
 
-        async with self.session.begin():
+        try:
 
-            student = await self.session.get(Students, student_id)
+            async with self.session.begin():
 
-            if student is None:
-                logger.warning(f"Student id={student_id} not found")
-                return False
+                student = await self.session.get(Students, student_id)
 
-            await self.session.delete(student)
-            await self.session.flush()
+                if student is None:
+                    logger.warning(f"Student id={student_id} not found")
+                    return False
 
-            logger.success(f"Student id={student_id} deleted")
-            return True
+                await self.session.delete(student)
+                await self.session.flush()
+
+                logger.success(f"Student id={student_id} deleted")
+                return True
+
+        except Exception as error:
+
+            logger.error(f"delete_student failed: {error}")
+            raise DatabaseOperationError(error) from error

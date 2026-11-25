@@ -2,6 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.backend.logs import logger
+from src.backend.exceptions import DatabaseOperationError
 from src.backend.database.models import Posts
 from datetime import datetime
 
@@ -18,70 +19,105 @@ class PostsOperations:
 
         logger.info("Creating post...")
 
-        async with self.session.begin():
+        try:
 
-            obj = Posts(title=title, summary=summary, image_url=image_url, published_at=published_at)
-            self.session.add(obj)
-            await self.session.flush()
+            async with self.session.begin():
 
-            logger.success(f"Post created (id={obj.id})")
-            return obj
+                obj = Posts(title=title, summary=summary, image_url=image_url, published_at=published_at)
+                self.session.add(obj)
+                await self.session.flush()
+
+                logger.success(f"Post created (id={obj.id})")
+                return obj
+
+        except Exception as error:
+
+            logger.error(f"create_post failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def get_post(self, post_id: int) -> Posts | None:
 
         logger.info(f"Getting post id={post_id}...")
 
-        async with self.session.begin():
+        try:
 
-            return await self.session.get(Posts, post_id)
+            async with self.session.begin():
+
+                return await self.session.get(Posts, post_id)
+
+        except Exception as error:
+
+            logger.error(f"get_post failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def list_posts(self) -> list[Posts]:
 
         logger.info("Listing posts...")
 
-        async with self.session.begin():
+        try:
 
-            result = await self.session.execute(select(Posts).order_by(Posts.published_at.desc()))
-            return list(result.scalars().all())
+            async with self.session.begin():
+
+                result = await self.session.execute(select(Posts).order_by(Posts.published_at.desc()))
+                return list(result.scalars().all())
+
+        except Exception as error:
+
+            logger.error(f"list_posts failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def update_post(self, post_id: int, **fields) -> Posts | None:
 
         logger.info(f"Updating post id={post_id}...")
 
-        async with self.session.begin():
+        try:
 
-            obj = await self.session.get(Posts, post_id)
+            async with self.session.begin():
 
-            if obj is None:
-                logger.warning(f"Post id={post_id} not found")
-                return None
+                obj = await self.session.get(Posts, post_id)
 
-            for key, value in fields.items():
+                if obj is None:
+                    logger.warning(f"Post id={post_id} not found")
+                    return None
 
-                if key not in ALLOWED_FIELDS:
-                    raise ValueError(f"Invalid field for post: {key}")
+                for key, value in fields.items():
 
-                setattr(obj, key, value)
+                    if key not in ALLOWED_FIELDS:
+                        raise ValueError(f"Invalid field for post: {key}")
 
-            await self.session.flush()
+                    setattr(obj, key, value)
 
-            logger.success(f"Post id={post_id} updated")
-            return obj
+                await self.session.flush()
+
+                logger.success(f"Post id={post_id} updated")
+                return obj
+
+        except Exception as error:
+
+            logger.error(f"update_post failed: {error}")
+            raise DatabaseOperationError(error) from error
 
     async def delete_post(self, post_id: int) -> bool:
 
         logger.info(f"Deleting post id={post_id}...")
 
-        async with self.session.begin():
+        try:
 
-            obj = await self.session.get(Posts, post_id)
+            async with self.session.begin():
 
-            if obj is None:
-                logger.warning(f"Post id={post_id} not found")
-                return False
+                obj = await self.session.get(Posts, post_id)
 
-            await self.session.delete(obj)
-            await self.session.flush()
+                if obj is None:
+                    logger.warning(f"Post id={post_id} not found")
+                    return False
 
-            logger.success(f"Post id={post_id} deleted")
-            return True
+                await self.session.delete(obj)
+                await self.session.flush()
+
+                logger.success(f"Post id={post_id} deleted")
+                return True
+
+        except Exception as error:
+
+            logger.error(f"delete_post failed: {error}")
+            raise DatabaseOperationError(error) from error
