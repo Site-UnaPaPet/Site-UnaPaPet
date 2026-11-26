@@ -8,7 +8,8 @@
 ![npm](https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
-![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-000000?style=for-the-badge&logo=shadcnui&logoColor=white)
 
 Frontend do site do UnaPáPet, feito em **React + TypeScript** (com Vite). Todo o código fica em `src/frontend/`.
 
@@ -182,6 +183,17 @@ Peças que se repetem em todas as páginas. Só entram aqui componentes de estru
 
 Imagens (fotos, logo), ícones e fontes usados no site. Importe os arquivos nos componentes, em vez de usar caminhos soltos. Use nomes em minúsculo e sem espaços (`logo-unapapet.svg`), e prefira SVG para ícones e `.webp` para fotos, para o site carregar rápido.
 
+## Tailwind CSS e shadcn/ui
+
+O estilo agora é feito com **Tailwind CSS v4** (classes direto no JSX) e componentes do **shadcn/ui** (botão, card, gaveta do menu).
+
+- **Cores e fontes** continuam em `styles/variables.css`. O `styles/global.css` liga essas variáveis aos nomes que o Tailwind e o shadcn usam (`bg-primary`, `bg-card`, `text-muted-foreground`, `font-heading`...). **Use esses nomes**, e não cores soltas como `bg-[#4a2400]`.
+- **Componentes do shadcn** ficam em `components/ui/` (gerados pela CLI, o código é nosso e pode ser editado). Para adicionar um novo: `cd src/frontend && npx shadcn@latest add <nome>` (ex.: `input`, `dialog`).
+- **Atalho de import:** `@/` aponta para `src/frontend/`. Exemplo: `import { Button } from "@/components/ui/button"`.
+- **Mobile primeiro:** escreva a classe base para celular e acrescente `sm:`, `md:` para telas maiores.
+- Os arquivos `styles/pages/*.css` não são mais necessários: o estilo de cada página fica nas classes do próprio componente.
+- Fontes (Young Serif, Open Sans e Montserrat) são carregadas no `index.html`.
+
 ## Paleta de cores
 
 Valores aproximados tirados do template, que devem ser confirmados com o time de design e ficar em `variables.css`.
@@ -308,4 +320,5 @@ docker compose down            # para e remove o container
 - O projeto já roda (`npm run dev` abre uma página em branco). O setup está pronto: `package.json`, `tsconfig.json`, `vite.config.ts` (com `envDir` apontando para a raiz) e o `.gitignore` na raiz.
 - `index.html` e `main.tsx` já têm o mínimo para iniciar o app.
 - Os `services/` estão prontos (funções, tipos e tratamento de erro) e conferidos com `tsc --noEmit` e contra a API de verdade. Falta ligar as páginas a eles.
-- Os demais `.tsx` são só esqueletos, sem conteúdo. Os `.css` estão vazios.
+- **Pronta:** a página **Presença** (`pages/Presenca/Presenca.tsx`), com `Layout`, `Header` (menu em gaveta no celular) e `PageBanner`. Enquanto as outras páginas não existem, `/` abre a Presença e as demais rotas mostram "Página em construção" (em `routes/AppRoutes.tsx`).
+- Os demais `.tsx` (Home, Calendário, Formulários, Blog, Consulta por RA e Footer) ainda são esqueletos.
