@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Liga os nomes de cor do Tailwind/shadcn (bg-primary, text-muted-foreground...) às variáveis de tema abaixo */
+
 @theme inline {
     --font-heading: var(--fonte-titulo);
     --font-sans: var(--fonte-texto);
