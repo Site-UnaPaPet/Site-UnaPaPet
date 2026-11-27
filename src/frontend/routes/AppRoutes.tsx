@@ -1,6 +1,7 @@
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import Formularios from "@/pages/Formularios/Formularios";
 import Presenca from "@/pages/Presenca/Presenca";
 
 // Provisório: as outras páginas ainda não existem, então elas mostram este aviso em vez de uma tela em branco.
@@ -23,6 +24,7 @@ export default function AppRoutes() {
       {/* Provisório: a Home ainda não existe, então o início abre a Presença */}
       <Route path="/" element={<Navigate to="/presenca" replace />} />
       <Route path="/presenca" element={<Presenca />} />
+      <Route path="/formularios" element={<Formularios />} />
       <Route path="*" element={<EmConstrucao />} />
     </Routes>
   );

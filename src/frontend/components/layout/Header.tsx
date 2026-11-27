@@ -38,7 +38,7 @@ export default function Header() {
 
   return (
     <header className="bg-background">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+      <div className="flex w-full items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <Logo />
 
         {/* Telas médias e grandes: menu em linha */}
