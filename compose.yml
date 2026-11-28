@@ -1,0 +1,52 @@
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.back
+
+    container_name: backend
+
+   
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      ORIGIN: ${ORIGIN:?defina ORIGIN}
+      RATE_LIMIT: ${RATE_LIMIT:?defina RATE_LIMIT}
+      GLOBAL_RATE_LIMIT: ${GLOBAL_RATE_LIMIT:?defina GLOBAL_RATE_LIMIT}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?defina ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina ADMIN_PASSWORD}
+      URL_DB: ${URL_DB:-sqlite:///data/data.db}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+
+    ports:
+      - 8000:8000
+    
+    healthcheck:
+      test: ["CMD", "curl", "i","-f", "http://localhost:8000/health"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  interface:
+    build:
+      context: .
+      dockerfile: Dockerfile.interface
+
+    container_name: interface
+
+    # O navegador é quem chama a API, então a URL é a da porta publicada do backend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+
+    ports:
+      - 5173:5173
+    
+    depends_on:
+      backend:
+        condition: service_healthy
+
+
+  
+
+  

@@ -1,0 +1,59 @@
+name: backend
+
+on:
+
+    push:
+        branches:
+            - main
+            - develop
+    
+    pull_request:
+        branches:
+            - main
+            - develop
+
+jobs:
+
+    build:
+
+        runs-on: ubuntu-latest
+
+        # Variáveis do .env, só valores de teste (sem secrets). Valem para todos os passos deste job.
+        env:
+            VITE_API_URL: http://localhost:8000
+            JWT_SECRET: segredo-de-teste-do-ci
+            ORIGIN: "*"
+            RATE_LIMIT: "1000"
+            GLOBAL_RATE_LIMIT: "100000"
+            URL_DB: sqlite:///data/data.db
+            COOKIE_SECURE: "false"
+            ADMIN_EMAIL: admin@teste.com
+            ADMIN_PASSWORD: admin1234
+
+        steps:
+
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                python-version: 3.14
+
+            - name: install dependences
+              run: pip install -r requirements.txt
+            
+            - name: test db
+              run: python -m src.tests.db
+
+            - name: test token
+              run: python -m src.tests.encode
+
+            - name: create server
+              run: docker compose up --build -d
+            
+            - name: wait 10 seconds
+              run: sleep 10
+            
+            - name: test api
+              run: python -m src.tests.api.main
+                
+

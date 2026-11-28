@@ -1,0 +1,17 @@
+/* Fonte única das cores e fontes do site (paleta do docs/template.zip). Só variáveis, sem regras de seletor. */
+:root {
+  /* Paleta */
+  --marrom-escuro: #552e2e;
+  --marrom-texto: #4a2400;
+  --vermelho: #a80000;
+  --preto: #1e1e1e;
+  --off-white: #f5f3ef;
+  --creme: #efe2d3;
+  --bege: #deba9b;
+  --pessego: #f3d2bc;
+
+  /* Fontes (carregadas no index.html) */
+  --fonte-titulo: "Young Serif", Georgia, serif;
+  --fonte-texto: "Open Sans", system-ui, sans-serif;
+  --fonte-suave: "Montserrat", system-ui, sans-serif;
+}
